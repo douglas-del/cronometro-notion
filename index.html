@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronômetro Notion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #1a1a1a; }
+        .notion-app-container { background-color: #262626; border: 1px solid #3a3a3a; }
+        .notion-input, .notion-select { background-color: #373737; border: 1px solid #4a4a4a; color: #e0e0e0; }
+        .notion-button-primary { background-color: #2563EB; }
+        .modal-backdrop { background-color: rgba(0, 0, 0, 0.7); }
+    </style>
+</head>
+<body class="p-4">
+
+    <main class="w-full max-w-lg mx-auto notion-app-container rounded-lg shadow-2xl p-6 space-y-6">
+        
+        <div class="text-center">
+            <h1 class="text-2xl font-bold text-white">Cronômetro Notion</h1>
+            <div id="loadingState" class="text-sm text-yellow-400 mt-2 flex items-center justify-center gap-2">
+                <i class="fas fa-sync-alt fa-spin"></i>
+                <span>Conectando ao Notion...</span>
+            </div>
+            <div id="errorState" class="text-sm text-red-500 mt-2 hidden"></div>
+        </div>
+
+        <!-- Seção de Seleção de Tarefa -->
+        <div id="taskSelector" class="space-y-3 hidden">
+            <div>
+                <label for="clientSelect" class="block text-sm font-medium text-gray-300 mb-1">Cliente</label>
+                <select id="clientSelect" class="w-full p-2 notion-select rounded-md"></select>
+            </div>
+            <div>
+                <label for="demandSelect" class="block text-sm font-medium text-gray-300 mb-1">Demanda</label>
+                <div class="flex gap-2">
+                    <select id="demandSelect" class="w-full p-2 notion-select rounded-md"></select>
+                    <button id="newDemandBtn" class="p-2 bg-gray-600 rounded-md hover:bg-gray-500" title="Nova Demanda">
+                        <i class="fas fa-plus text-white"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção do Cronômetro -->
+        <div id="timerControls" class="text-center space-y-4 hidden">
+            <p id="timerDisplay" class="text-5xl font-bold text-white tabular-nums">00:00:00</p>
+            <button id="toggleButton" class="w-full px-6 py-3 notion-button-primary text-white font-semibold rounded-md">
+                <i class="fas fa-play mr-2"></i>
+                <span>Iniciar</span>
+            </button>
+        </div>
+    </main>
+
+    <!-- Modal para Nova Demanda -->
+    <div id="newDemandModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4">
+            <h3 class="text-xl font-bold">Criar Nova Demanda</h3>
+            <div>
+                <label for="newDemandClientSelect" class="block text-sm font-medium text-gray-300 mb-1">Associar ao Cliente:</label>
+                <select id="newDemandClientSelect" class="w-full p-2 notion-select rounded-md"></select>
+            </div>
+             <div>
+                <label for="newDemandName" class="block text-sm font-medium text-gray-300 mb-1">Nome da Nova Demanda:</label>
+                <input type="text" id="newDemandName" class="w-full p-2 notion-input rounded-md">
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal('newDemandModal')" class="px-4 py-2 bg-gray-600 text-white rounded-md">Cancelar</button>
+                <button id="saveDemandButton" class="px-4 py-2 notion-button-primary text-white rounded-md">Criar Demanda</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ===================================================================================
+    // CONFIGURAÇÃO
+    // ===================================================================================
+    // Cole aqui o URL do seu servidor Replit
+    const API_BASE_URL = "https://1c0c4530-bc61-4702-86e1-725409df1bb5-00-135smurbmm12i.kirk.replit.dev";
+
+    // ===================================================================================
+    // LÓGICA DO APLICATIVO
+    // ===================================================================================
+    
+    // --- Elementos da UI ---
+    const loadingState = document.getElementById('loadingState');
+    const errorState = document.getElementById('errorState');
+    const taskSelector = document.getElementById('taskSelector');
+    const timerControls = document.getElementById('timerControls');
+    const clientSelect = document.getElementById('clientSelect');
+    const demandSelect = document.getElementById('demandSelect');
+    const newDemandBtn = document.getElementById('newDemandBtn');
+    const toggleButton = document.getElementById('toggleButton');
+    const timerDisplay = document.getElementById('timerDisplay');
+    
+    // --- Modal Nova Demanda ---
+    const newDemandModal = document.getElementById('newDemandModal');
+    const newDemandClientSelect = document.getElementById('newDemandClientSelect');
+    const newDemandName = document.getElementById('newDemandName');
+    const saveDemandButton = document.getElementById('saveDemandButton');
+
+    // --- Estado do Aplicativo ---
+    let appState = {
+        clients: [],
+        demands: [],
+        isTimerRunning: false,
+        startTime: null,
+        timerInterval: null,
+        selectedDemandId: null,
+    };
+
+    // --- Funções de Comunicação com o Backend ---
+    const api = {
+        async getClients() {
+            const response = await fetch(`${API_BASE_URL}/api/clients`);
+            if (!response.ok) throw new Error('Falha ao buscar clientes.');
+            return response.json();
+        },
+        async getDemands() {
+            const response = await fetch(`${API_BASE_URL}/api/demands`);
+            if (!response.ok) throw new Error('Falha ao buscar demandas.');
+            return response.json();
+        },
+        async createDemand(clientId, demandName) {
+            const response = await fetch(`${API_BASE_URL}/api/demands`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clientId, demandName })
+            });
+            if (!response.ok) throw new Error('Falha ao criar demanda.');
+            return response.json();
+        },
+        async createTimeEntry(demandId, durationSeconds) {
+            const response = await fetch(`${API_BASE_URL}/api/time-entries`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ demandId, durationSeconds })
+            });
+            if (!response.ok) throw new Error('Falha ao criar registro de tempo.');
+            return response.json();
+        }
+    };
+    
+    // --- Funções da UI ---
+    function populateSelect(selectElement, items, defaultOption) {
+        selectElement.innerHTML = `<option value="">${defaultOption}</option>`;
+        items.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.id;
+            option.textContent = item.name;
+            selectElement.appendChild(option);
+        });
+    }
+
+    function filterDemandsByClient(clientId) {
+        const filteredDemands = clientId ? appState.demands.filter(d => d.clientId === clientId) : [];
+        populateSelect(demandSelect, filteredDemands, 'Selecione uma demanda');
+    }
+
+    function toggleTimer() {
+        if (appState.isTimerRunning) {
+            // Parar o cronômetro
+            clearInterval(appState.timerInterval);
+            const endTime = Date.now();
+            const durationSeconds = Math.round((endTime - appState.startTime) / 1000);
+            
+            api.createTimeEntry(appState.selectedDemandId, durationSeconds)
+                .then(response => {
+                    console.log('Registro criado com sucesso!', response);
+                    alert(`Tempo registrado: ${formatTime(durationSeconds * 1000)}`);
+                })
+                .catch(err => {
+                    console.error('Erro ao criar registro:', err);
+                    alert('Falha ao registrar o tempo.');
+                });
+
+            // Reset UI
+            appState.isTimerRunning = false;
+            toggleButton.innerHTML = `<i class="fas fa-play mr-2"></i><span>Iniciar</span>`;
+            toggleButton.classList.remove('bg-red-600');
+            timerDisplay.textContent = '00:00:00';
+            clientSelect.disabled = false;
+            demandSelect.disabled = false;
+
+        } else {
+            // Iniciar o cronômetro
+            const selectedDemandId = demandSelect.value;
+            if (!selectedDemandId) {
+                alert('Por favor, selecione uma demanda para iniciar.');
+                return;
+            }
+            appState.selectedDemandId = selectedDemandId;
+            appState.isTimerRunning = true;
+            appState.startTime = Date.now();
+            
+            appState.timerInterval = setInterval(() => {
+                const elapsed = Date.now() - appState.startTime;
+                timerDisplay.textContent = formatTime(elapsed);
+            }, 1000);
+
+            // Update UI
+            toggleButton.innerHTML = `<i class="fas fa-stop mr-2"></i><span>Parar</span>`;
+            toggleButton.classList.add('bg-red-600');
+            clientSelect.disabled = true;
+            demandSelect.disabled = true;
+        }
+    }
+    
+    const formatTime = (ms) => {
+        const totalSeconds = Math.floor(ms / 1000);
+        const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+        const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+        const s = (totalSeconds % 60).toString().padStart(2, '0');
+        return `${h}:${m}:${s}`;
+    };
+
+    function openModal(modalId) { document.getElementById(modalId).classList.remove('hidden'); }
+    function closeModal(modalId) { document.getElementById(modalId).classList.add('hidden'); }
+
+    // --- Inicialização do App ---
+    async function initializeApp() {
+        try {
+            const [clients, demands] = await Promise.all([
+                api.getClients(),
+                api.getDemands()
+            ]);
+            
+            appState.clients = clients;
+            appState.demands = demands;
+
+            populateSelect(clientSelect, appState.clients, 'Selecione um cliente');
+            populateSelect(newDemandClientSelect, appState.clients, 'Selecione...');
+            
+            loadingState.classList.add('hidden');
+            taskSelector.classList.remove('hidden');
+            timerControls.classList.remove('hidden');
+
+        } catch (error) {
+            console.error("Erro ao inicializar:", error);
+            loadingState.classList.add('hidden');
+            errorState.textContent = `Erro ao conectar ao Notion: ${error.message}`;
+            errorState.classList.remove('hidden');
+        }
+    }
+
+    // --- Event Listeners ---
+    clientSelect.addEventListener('change', (e) => filterDemandsByClient(e.target.value));
+    toggleButton.addEventListener('click', toggleTimer);
+    newDemandBtn.addEventListener('click', () => openModal('newDemandModal'));
+    saveDemandButton.addEventListener('click', async () => {
+        const clientId = newDemandClientSelect.value;
+        const demandName = newDemandName.value.trim();
+        if (!clientId || !demandName) {
+            alert('Preencha todos os campos para criar a demanda.');
+            return;
+        }
+        try {
+            const newDemand = await api.createDemand(clientId, demandName);
+            appState.demands.push(newDemand);
+            filterDemandsByClient(clientSelect.value);
+            demandSelect.value = newDemand.id;
+            closeModal('newDemandModal');
+        } catch (error) {
+            alert(`Erro ao criar demanda: ${error.message}`);
+        }
+    });
+
+    // --- Inicia o aplicativo ---
+    document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
