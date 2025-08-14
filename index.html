@@ -28,30 +28,47 @@
             <div id="errorState" class="text-sm text-red-500 mt-2 hidden"></div>
         </div>
 
-        <!-- Seção de Seleção de Tarefa -->
-        <div id="taskSelector" class="space-y-3 hidden">
-            <div>
-                <label for="clientSelect" class="block text-sm font-medium text-gray-300 mb-1">Cliente</label>
-                <select id="clientSelect" class="w-full p-2 notion-select rounded-md"></select>
+        <!-- Conteúdo Principal do App -->
+        <div id="mainApp" class="hidden">
+            <!-- Seção do Cronômetro -->
+            <div id="taskSelector" class="space-y-3">
+                <div>
+                    <label for="clientSelect" class="block text-sm font-medium text-gray-300 mb-1">Cliente</label>
+                    <select id="clientSelect" class="w-full p-2 notion-select rounded-md"></select>
+                </div>
+                <div>
+                    <label for="demandSelect" class="block text-sm font-medium text-gray-300 mb-1">Demanda</label>
+                    <div class="flex gap-2">
+                        <select id="demandSelect" class="w-full p-2 notion-select rounded-md"></select>
+                        <button id="newDemandBtn" class="p-2 bg-gray-600 rounded-md hover:bg-gray-500" title="Nova Demanda">
+                            <i class="fas fa-plus text-white"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label for="demandSelect" class="block text-sm font-medium text-gray-300 mb-1">Demanda</label>
-                <div class="flex gap-2">
-                    <select id="demandSelect" class="w-full p-2 notion-select rounded-md"></select>
-                    <button id="newDemandBtn" class="p-2 bg-gray-600 rounded-md hover:bg-gray-500" title="Nova Demanda">
-                        <i class="fas fa-plus text-white"></i>
+
+            <div id="timerControls" class="text-center space-y-4 mt-4">
+                <p id="timerDisplay" class="text-5xl font-bold text-white tabular-nums">00:00:00</p>
+                <button id="toggleButton" class="w-full px-6 py-3 notion-button-primary text-white font-semibold rounded-md">
+                    <i class="fas fa-play mr-2"></i>
+                    <span>Iniciar</span>
+                </button>
+            </div>
+
+            <!-- Seção de Relatórios -->
+            <div class="border-t border-gray-700 mt-6 pt-6">
+                <h2 class="text-lg font-bold text-white mb-3 text-center">Relatório Semanal</h2>
+                <div class="space-y-3">
+                     <div>
+                        <label for="reportClientSelect" class="block text-sm font-medium text-gray-300 mb-1">Selecione o Cliente para o Relatório</label>
+                        <select id="reportClientSelect" class="w-full p-2 notion-select rounded-md"></select>
+                    </div>
+                    <button id="generateReportBtn" class="w-full px-6 py-2 bg-green-600 text-white font-semibold rounded-md">
+                        <i class="fas fa-file-excel mr-2"></i>
+                        <span>Gerar e Atualizar Planilha</span>
                     </button>
                 </div>
             </div>
-        </div>
-
-        <!-- Seção do Cronômetro -->
-        <div id="timerControls" class="text-center space-y-4 hidden">
-            <p id="timerDisplay" class="text-5xl font-bold text-white tabular-nums">00:00:00</p>
-            <button id="toggleButton" class="w-full px-6 py-3 notion-button-primary text-white font-semibold rounded-md">
-                <i class="fas fa-play mr-2"></i>
-                <span>Iniciar</span>
-            </button>
         </div>
     </main>
 
@@ -78,7 +95,7 @@
     // ===================================================================================
     // CONFIGURAÇÃO
     // ===================================================================================
-    // URL do seu servidor Replit.
+    // Cole aqui o URL do seu servidor Replit
     const API_BASE_URL = "https://ef6a0caf-b9d1-4175-b371-447d581b64dc-00-1y3du8b3xyoj2.janeway.replit.dev";
 
     // ===================================================================================
@@ -88,13 +105,14 @@
     // --- Elementos da UI ---
     const loadingState = document.getElementById('loadingState');
     const errorState = document.getElementById('errorState');
-    const taskSelector = document.getElementById('taskSelector');
-    const timerControls = document.getElementById('timerControls');
+    const mainApp = document.getElementById('mainApp');
     const clientSelect = document.getElementById('clientSelect');
     const demandSelect = document.getElementById('demandSelect');
     const newDemandBtn = document.getElementById('newDemandBtn');
     const toggleButton = document.getElementById('toggleButton');
     const timerDisplay = document.getElementById('timerDisplay');
+    const reportClientSelect = document.getElementById('reportClientSelect');
+    const generateReportBtn = document.getElementById('generateReportBtn');
     
     // --- Modal Nova Demanda ---
     const newDemandModal = document.getElementById('newDemandModal');
@@ -141,6 +159,27 @@
             });
             if (!response.ok) throw new Error('Falha ao criar registro de tempo.');
             return response.json();
+        },
+        async generateReport(clientId, clientName) {
+            const btn = generateReportBtn;
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-sync-alt fa-spin mr-2"></i><span>Gerando...</span>`;
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/generate-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clientId, clientName })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Falha ao gerar relatório.');
+                }
+                const result = await response.json();
+                alert(result.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-file-excel mr-2"></i><span>Gerar e Atualizar Planilha</span>`;
+            }
         }
     };
     
@@ -223,20 +262,15 @@
     // --- Inicialização do App ---
     async function initializeApp() {
         try {
-            const [clients, demands] = await Promise.all([
-                api.getClients(),
-                api.getDemands()
-            ]);
-            
+            const [clients, demands] = await Promise.all([api.getClients(), api.getDemands()]);
             appState.clients = clients;
             appState.demands = demands;
 
             populateSelect(clientSelect, appState.clients, 'Selecione um cliente');
-            populateSelect(newDemandClientSelect, appState.clients, 'Selecione...');
+            populateSelect(reportClientSelect, appState.clients, 'Selecione um cliente');
             
             loadingState.classList.add('hidden');
-            taskSelector.classList.remove('hidden');
-            timerControls.classList.remove('hidden');
+            mainApp.classList.remove('hidden');
 
         } catch (error) {
             console.error("Erro ao inicializar:", error);
@@ -266,6 +300,16 @@
         } catch (error) {
             alert(`Erro ao criar demanda: ${error.message}`);
         }
+    });
+
+    generateReportBtn.addEventListener('click', () => {
+        const clientId = reportClientSelect.value;
+        if (!clientId) {
+            alert('Por favor, selecione um cliente para gerar o relatório.');
+            return;
+        }
+        const clientName = reportClientSelect.options[reportClientSelect.selectedIndex].text;
+        api.generateReport(clientId, clientName).catch(err => alert(err.message));
     });
 
     // --- Inicia o aplicativo ---
