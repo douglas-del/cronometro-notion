@@ -136,4 +136,224 @@
             if (!response.ok) throw new Error('Falha ao buscar clientes.');
             return response.json();
         },
-        async getDemands(
+        async getDemands() {
+            const response = await fetch(`${API_BASE_URL}/api/demands`);
+            if (!response.ok) throw new Error('Falha ao buscar demandas.');
+            return response.json();
+        },
+        async createDemand(clientId, demandName) {
+            const response = await fetch(`${API_BASE_URL}/api/demands`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clientId, demandName })
+            });
+            if (!response.ok) throw new Error('Falha ao criar demanda.');
+            return response.json();
+        },
+        async createTimeEntry(demandId, durationSeconds) {
+            const response = await fetch(`${API_BASE_URL}/api/time-entries`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ demandId, durationSeconds })
+            });
+            if (!response.ok) throw new Error('Falha ao criar registro de tempo.');
+            return response.json();
+        },
+        async generateReport(clientId, clientName) {
+            const btn = generateReportBtn;
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-sync-alt fa-spin mr-2"></i><span>Gerando...</span>`;
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/generate-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clientId, clientName })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Falha ao gerar relatório.');
+                }
+                const result = await response.json();
+                alert(result.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-file-excel mr-2"></i><span>Gerar e Atualizar Planilha</span>`;
+            }
+        }
+    };
+    
+    function populateSelect(selectElement, items, defaultOption) {
+        selectElement.innerHTML = `<option value="">${defaultOption}</option>`;
+        items.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.id;
+            option.textContent = item.name;
+            selectElement.appendChild(option);
+        });
+    }
+
+    function filterDemandsByClient(clientId) {
+        const filteredDemands = clientId ? appState.demands.filter(d => d.clientId === clientId) : [];
+        populateSelect(demandSelect, filteredDemands, 'Selecione uma demanda');
+    }
+
+    const formatTime = (ms) => {
+        if (ms < 0) ms = 0;
+        const totalSeconds = Math.floor(ms / 1000);
+        const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+        const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+        const s = (totalSeconds % 60).toString().padStart(2, '0');
+        return `${h}:${m}:${s}`;
+    };
+
+    function startTimerDisplay() {
+        if (appState.timerInterval) clearInterval(appState.timerInterval);
+        appState.timerInterval = setInterval(() => {
+            const elapsed = Date.now() - appState.startTime;
+            timerDisplay.textContent = formatTime(elapsed);
+        }, 1000);
+    }
+
+    function toggleTimer() {
+        if (appState.isTimerRunning) {
+            // Parando o cronômetro
+            clearInterval(appState.timerInterval);
+            const endTime = Date.now();
+            const durationSeconds = Math.round((endTime - appState.startTime) / 1000);
+            
+            // **CORREÇÃO CRÍTICA NA LÓGICA DE SALVAMENTO**
+            api.createTimeEntry(appState.selectedDemandId, durationSeconds)
+                .then(response => {
+                    console.log('Registro criado com sucesso!', response);
+                    alert(`Tempo registrado: ${formatTime(durationSeconds * 1000)}`);
+                    
+                    // Limpa o estado salvo SOMENTE APÓS o sucesso
+                    localStorage.removeItem('timerStartTime');
+                    localStorage.removeItem('timerActiveDemandId');
+                    
+                    // Reset UI
+                    appState.isTimerRunning = false;
+                    toggleButton.innerHTML = `<i class="fas fa-play mr-2"></i><span>Iniciar</span>`;
+                    toggleButton.classList.remove('bg-red-600');
+                    timerDisplay.textContent = '00:00:00';
+                    clientSelect.disabled = false;
+                    demandSelect.disabled = false;
+                })
+                .catch(err => {
+                    console.error('Erro ao criar registro:', err);
+                    alert('Falha ao registrar o tempo. O servidor pode estar inativo. Por favor, "acorde" o servidor no Replit e tente parar novamente. Seu tempo não foi perdido.');
+                });
+
+        } else {
+            // Iniciando o cronômetro
+            const selectedDemandId = demandSelect.value;
+            if (!selectedDemandId) {
+                alert('Por favor, selecione uma demanda para iniciar.');
+                return;
+            }
+            appState.selectedDemandId = selectedDemandId;
+            appState.isTimerRunning = true;
+            appState.startTime = Date.now();
+            
+            localStorage.setItem('timerStartTime', appState.startTime);
+            localStorage.setItem('timerActiveDemandId', appState.selectedDemandId);
+            
+            startTimerDisplay();
+
+            toggleButton.innerHTML = `<i class="fas fa-stop mr-2"></i><span>Parar</span>`;
+            toggleButton.classList.add('bg-red-600');
+            clientSelect.disabled = true;
+            demandSelect.disabled = true;
+        }
+    }
+    
+    function openModal(modalId) { 
+        const modal = document.getElementById(modalId);
+        modal.classList.remove('hidden');
+    }
+    function closeModal(modalId) { 
+        const modal = document.getElementById(modalId);
+        modal.classList.add('hidden');
+    }
+
+    async function initializeApp() {
+        try {
+            const [clients, demands] = await Promise.all([api.getClients(), api.getDemands()]);
+            appState.clients = clients;
+            appState.demands = demands;
+
+            populateSelect(clientSelect, appState.clients, 'Selecione um cliente');
+            populateSelect(reportClientSelect, appState.clients, 'Selecione um cliente');
+            populateSelect(newDemandClientSelect, appState.clients, 'Selecione...');
+            
+            const savedStartTime = localStorage.getItem('timerStartTime');
+            const savedDemandId = localStorage.getItem('timerActiveDemandId');
+
+            if (savedStartTime && savedDemandId) {
+                appState.isTimerRunning = true;
+                appState.startTime = parseInt(savedStartTime, 10);
+                appState.selectedDemandId = savedDemandId;
+
+                const activeDemand = appState.demands.find(d => d.id === savedDemandId);
+                if (activeDemand) {
+                    clientSelect.value = activeDemand.clientId;
+                    filterDemandsByClient(activeDemand.clientId);
+                    demandSelect.value = savedDemandId;
+                }
+
+                toggleButton.innerHTML = `<i class="fas fa-stop mr-2"></i><span>Parar</span>`;
+                toggleButton.classList.add('bg-red-600');
+                clientSelect.disabled = true;
+                demandSelect.disabled = true;
+                startTimerDisplay();
+            }
+            
+            loadingState.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+
+        } catch (error) {
+            console.error("Erro ao inicializar:", error);
+            loadingState.classList.add('hidden');
+            errorState.textContent = `Erro ao conectar ao Notion: ${error.message}`;
+            errorState.classList.remove('hidden');
+        }
+    }
+
+    clientSelect.addEventListener('change', (e) => filterDemandsByClient(e.target.value));
+    toggleButton.addEventListener('click', toggleTimer);
+    newDemandBtn.addEventListener('click', () => openModal('newDemandModal'));
+    saveDemandButton.addEventListener('click', async () => {
+        const clientId = newDemandClientSelect.value;
+        const demandName = newDemandName.value.trim();
+        if (!clientId || !demandName) {
+            alert('Preencha todos os campos para criar a demanda.');
+            return;
+        }
+        try {
+            const newDemand = await api.createDemand(clientId, demandName);
+            appState.demands.push(newDemand);
+            const currentClient = clientSelect.value;
+            filterDemandsByClient(currentClient);
+            if (clientId === currentClient) {
+                demandSelect.value = newDemand.id;
+            }
+            closeModal('newDemandModal');
+        } catch (error) {
+            alert(`Erro ao criar demanda: ${error.message}`);
+        }
+    });
+
+    generateReportBtn.addEventListener('click', () => {
+        const clientId = reportClientSelect.value;
+        if (!clientId) {
+            alert('Por favor, selecione um cliente para gerar o relatório.');
+            return;
+        }
+        const clientName = reportClientSelect.options[reportClientSelect.selectedIndex].text;
+        api.generateReport(clientId, clientName).catch(err => alert(err.message));
+    });
+
+    document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
