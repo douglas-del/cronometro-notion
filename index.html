@@ -94,15 +94,19 @@
         </div>
     </div>
 
-    <!-- NOVO: Modal de Erro -->
+    <!-- Modal de Erro Aprimorado -->
     <div id="errorModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop">
-        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4 text-center">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4 text-center relative">
+            <!-- Botão X para fechar -->
+            <button onclick="closeModal('errorModal')" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+            
             <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
             <h3 class="text-xl font-bold text-white">Ocorreu um Erro</h3>
             <p id="errorMessage" class="text-gray-300">Mensagem de erro aqui.</p>
-            <div class="flex flex-col sm:flex-row justify-center gap-3 pt-4">
-                <button onclick="closeModal('errorModal')" class="px-4 py-2 bg-gray-600 text-white rounded-md w-full">Fechar</button>
-                <a href="https://replit.com/@douglas115/cronometro-notion-final" target="_blank" class="block px-4 py-2 bg-yellow-500 text-black font-semibold rounded-md w-full">
+            <div class="pt-4">
+                 <a href="https://replit.com/@douglas115/cronometro-notion-final" target="_blank" class="block px-4 py-2 bg-yellow-500 text-black font-semibold rounded-md w-full">
                     Acordar Servidor
                 </a>
             </div>
@@ -260,7 +264,7 @@
             // Iniciando o cronômetro
             const selectedDemandId = demandSelect.value;
             if (!selectedDemandId) {
-                alert('Por favor, selecione uma demanda para iniciar.');
+                showErrorModal('Por favor, selecione uma demanda para iniciar.');
                 return;
             }
             appState.selectedDemandId = selectedDemandId;
@@ -342,7 +346,7 @@
         const clientId = newDemandClientSelect.value;
         const demandName = newDemandName.value.trim();
         if (!clientId || !demandName) {
-            alert('Preencha todos os campos para criar a demanda.');
+            showErrorModal('Preencha todos os campos para criar a demanda.');
             return;
         }
         try {
@@ -362,7 +366,7 @@
     generateReportBtn.addEventListener('click', () => {
         const clientId = reportClientSelect.value;
         if (!clientId) {
-            alert('Por favor, selecione um cliente para gerar o relatório.');
+            showErrorModal('Por favor, selecione um cliente para gerar o relatório.');
             return;
         }
         const clientName = reportClientSelect.options[reportClientSelect.selectedIndex].text;
