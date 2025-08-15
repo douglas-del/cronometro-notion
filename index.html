@@ -73,7 +73,8 @@
     </main>
 
     <!-- Modal para Nova Demanda -->
-    <div id="newDemandModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop">
+    <!-- CORREÇÃO: Adicionada a classe 'flex' para centralizar corretamente -->
+    <div id="newDemandModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop">
         <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4">
             <h3 class="text-xl font-bold">Criar Nova Demanda</h3>
             <div>
@@ -263,8 +264,14 @@
         }
     }
     
-    function openModal(modalId) { document.getElementById(modalId).classList.remove('hidden'); }
-    function closeModal(modalId) { document.getElementById(modalId).classList.add('hidden'); }
+    function openModal(modalId) { 
+        const modal = document.getElementById(modalId);
+        modal.classList.remove('hidden');
+    }
+    function closeModal(modalId) { 
+        const modal = document.getElementById(modalId);
+        modal.classList.add('hidden');
+    }
 
     async function initializeApp() {
         try {
@@ -274,8 +281,9 @@
 
             populateSelect(clientSelect, appState.clients, 'Selecione um cliente');
             populateSelect(reportClientSelect, appState.clients, 'Selecione um cliente');
+            // **CORREÇÃO: Adicionada a linha que popula a lista de clientes no modal**
+            populateSelect(newDemandClientSelect, appState.clients, 'Selecione...');
             
-            // **NOVA LÓGICA: Verifica se um timer estava rodando**
             const savedStartTime = localStorage.getItem('timerStartTime');
             const savedDemandId = localStorage.getItem('timerActiveDemandId');
 
@@ -284,7 +292,6 @@
                 appState.startTime = parseInt(savedStartTime, 10);
                 appState.selectedDemandId = savedDemandId;
 
-                // Encontra o cliente da demanda que estava ativa
                 const activeDemand = appState.demands.find(d => d.id === savedDemandId);
                 if (activeDemand) {
                     clientSelect.value = activeDemand.clientId;
@@ -292,7 +299,6 @@
                     demandSelect.value = savedDemandId;
                 }
 
-                // Atualiza a UI para o estado "rodando"
                 toggleButton.innerHTML = `<i class="fas fa-stop mr-2"></i><span>Parar</span>`;
                 toggleButton.classList.add('bg-red-600');
                 clientSelect.disabled = true;
@@ -324,10 +330,8 @@
         try {
             const newDemand = await api.createDemand(clientId, demandName);
             appState.demands.push(newDemand);
-            // Atualiza a lista de clientes principal e filtra
             const currentClient = clientSelect.value;
             filterDemandsByClient(currentClient);
-            // Se o cliente da nova demanda for o selecionado, seleciona a nova demanda
             if (clientId === currentClient) {
                 demandSelect.value = newDemand.id;
             }
