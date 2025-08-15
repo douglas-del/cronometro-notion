@@ -11,7 +11,7 @@
         body { font-family: 'Inter', sans-serif; background-color: #1a1a1a; }
         .notion-app-container { background-color: #262626; border: 1px solid #3a3a3a; }
         .notion-input, .notion-select { background-color: #373737; border: 1px solid #4a4a4a; color: #e0e0e0; }
-        .notion-button-primary { background-color: #2563EB; }
+        .notion-button-primary { background-color: #10B981; /* Verde Esmeralda */ }
         .modal-backdrop { background-color: rgba(0, 0, 0, 0.7); }
     </style>
 </head>
@@ -73,10 +73,10 @@
     </main>
 
     <!-- Modal para Nova Demanda -->
-    <!-- CORREÇÃO: Adicionada a classe 'flex' para centralizar corretamente -->
     <div id="newDemandModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop">
         <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4">
-            <h3 class="text-xl font-bold">Criar Nova Demanda</h3>
+            <!-- CORREÇÃO: Adicionadas classes para cor e alinhamento -->
+            <h3 class="text-xl font-bold text-white text-center">Criar Nova Demanda</h3>
             <div>
                 <label for="newDemandClientSelect" class="block text-sm font-medium text-gray-300 mb-1">Associar ao Cliente:</label>
                 <select id="newDemandClientSelect" class="w-full p-2 notion-select rounded-md"></select>
@@ -281,7 +281,6 @@
 
             populateSelect(clientSelect, appState.clients, 'Selecione um cliente');
             populateSelect(reportClientSelect, appState.clients, 'Selecione um cliente');
-            // **CORREÇÃO: Adicionada a linha que popula a lista de clientes no modal**
             populateSelect(newDemandClientSelect, appState.clients, 'Selecione...');
             
             const savedStartTime = localStorage.getItem('timerStartTime');
