@@ -95,14 +95,12 @@
     // ===================================================================================
     // CONFIGURAÇÃO
     // ===================================================================================
-    // Cole aqui o URL do seu servidor Replit
     const API_BASE_URL = "https://ef6a0caf-b9d1-4175-b371-447d581b64dc-00-1y3du8b3xyoj2.janeway.replit.dev";
 
     // ===================================================================================
     // LÓGICA DO APLICATIVO
     // ===================================================================================
     
-    // --- Elementos da UI ---
     const loadingState = document.getElementById('loadingState');
     const errorState = document.getElementById('errorState');
     const mainApp = document.getElementById('mainApp');
@@ -113,14 +111,11 @@
     const timerDisplay = document.getElementById('timerDisplay');
     const reportClientSelect = document.getElementById('reportClientSelect');
     const generateReportBtn = document.getElementById('generateReportBtn');
-    
-    // --- Modal Nova Demanda ---
     const newDemandModal = document.getElementById('newDemandModal');
     const newDemandClientSelect = document.getElementById('newDemandClientSelect');
     const newDemandName = document.getElementById('newDemandName');
     const saveDemandButton = document.getElementById('saveDemandButton');
 
-    // --- Estado do Aplicativo ---
     let appState = {
         clients: [],
         demands: [],
@@ -130,7 +125,6 @@
         selectedDemandId: null,
     };
 
-    // --- Funções de Comunicação com o Backend ---
     const api = {
         async getClients() {
             const response = await fetch(`${API_BASE_URL}/api/clients`);
@@ -183,7 +177,6 @@
         }
     };
     
-    // --- Funções da UI ---
     function populateSelect(selectElement, items, defaultOption) {
         selectElement.innerHTML = `<option value="">${defaultOption}</option>`;
         items.forEach(item => {
@@ -199,9 +192,26 @@
         populateSelect(demandSelect, filteredDemands, 'Selecione uma demanda');
     }
 
+    const formatTime = (ms) => {
+        if (ms < 0) ms = 0;
+        const totalSeconds = Math.floor(ms / 1000);
+        const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+        const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+        const s = (totalSeconds % 60).toString().padStart(2, '0');
+        return `${h}:${m}:${s}`;
+    };
+
+    function startTimerDisplay() {
+        if (appState.timerInterval) clearInterval(appState.timerInterval);
+        appState.timerInterval = setInterval(() => {
+            const elapsed = Date.now() - appState.startTime;
+            timerDisplay.textContent = formatTime(elapsed);
+        }, 1000);
+    }
+
     function toggleTimer() {
         if (appState.isTimerRunning) {
-            // Parar o cronômetro
+            // Parando o cronômetro
             clearInterval(appState.timerInterval);
             const endTime = Date.now();
             const durationSeconds = Math.round((endTime - appState.startTime) / 1000);
@@ -216,6 +226,10 @@
                     alert('Falha ao registrar o tempo.');
                 });
 
+            // Limpa o estado salvo
+            localStorage.removeItem('timerStartTime');
+            localStorage.removeItem('timerActiveDemandId');
+            
             // Reset UI
             appState.isTimerRunning = false;
             toggleButton.innerHTML = `<i class="fas fa-play mr-2"></i><span>Iniciar</span>`;
@@ -225,7 +239,7 @@
             demandSelect.disabled = false;
 
         } else {
-            // Iniciar o cronômetro
+            // Iniciando o cronômetro
             const selectedDemandId = demandSelect.value;
             if (!selectedDemandId) {
                 alert('Por favor, selecione uma demanda para iniciar.');
@@ -235,10 +249,11 @@
             appState.isTimerRunning = true;
             appState.startTime = Date.now();
             
-            appState.timerInterval = setInterval(() => {
-                const elapsed = Date.now() - appState.startTime;
-                timerDisplay.textContent = formatTime(elapsed);
-            }, 1000);
+            // Salva o estado no localStorage
+            localStorage.setItem('timerStartTime', appState.startTime);
+            localStorage.setItem('timerActiveDemandId', appState.selectedDemandId);
+            
+            startTimerDisplay();
 
             // Update UI
             toggleButton.innerHTML = `<i class="fas fa-stop mr-2"></i><span>Parar</span>`;
@@ -248,18 +263,9 @@
         }
     }
     
-    const formatTime = (ms) => {
-        const totalSeconds = Math.floor(ms / 1000);
-        const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-        const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-        const s = (totalSeconds % 60).toString().padStart(2, '0');
-        return `${h}:${m}:${s}`;
-    };
-
     function openModal(modalId) { document.getElementById(modalId).classList.remove('hidden'); }
     function closeModal(modalId) { document.getElementById(modalId).classList.add('hidden'); }
 
-    // --- Inicialização do App ---
     async function initializeApp() {
         try {
             const [clients, demands] = await Promise.all([api.getClients(), api.getDemands()]);
@@ -268,6 +274,31 @@
 
             populateSelect(clientSelect, appState.clients, 'Selecione um cliente');
             populateSelect(reportClientSelect, appState.clients, 'Selecione um cliente');
+            
+            // **NOVA LÓGICA: Verifica se um timer estava rodando**
+            const savedStartTime = localStorage.getItem('timerStartTime');
+            const savedDemandId = localStorage.getItem('timerActiveDemandId');
+
+            if (savedStartTime && savedDemandId) {
+                appState.isTimerRunning = true;
+                appState.startTime = parseInt(savedStartTime, 10);
+                appState.selectedDemandId = savedDemandId;
+
+                // Encontra o cliente da demanda que estava ativa
+                const activeDemand = appState.demands.find(d => d.id === savedDemandId);
+                if (activeDemand) {
+                    clientSelect.value = activeDemand.clientId;
+                    filterDemandsByClient(activeDemand.clientId);
+                    demandSelect.value = savedDemandId;
+                }
+
+                // Atualiza a UI para o estado "rodando"
+                toggleButton.innerHTML = `<i class="fas fa-stop mr-2"></i><span>Parar</span>`;
+                toggleButton.classList.add('bg-red-600');
+                clientSelect.disabled = true;
+                demandSelect.disabled = true;
+                startTimerDisplay();
+            }
             
             loadingState.classList.add('hidden');
             mainApp.classList.remove('hidden');
@@ -280,7 +311,6 @@
         }
     }
 
-    // --- Event Listeners ---
     clientSelect.addEventListener('change', (e) => filterDemandsByClient(e.target.value));
     toggleButton.addEventListener('click', toggleTimer);
     newDemandBtn.addEventListener('click', () => openModal('newDemandModal'));
@@ -294,8 +324,13 @@
         try {
             const newDemand = await api.createDemand(clientId, demandName);
             appState.demands.push(newDemand);
-            filterDemandsByClient(clientSelect.value);
-            demandSelect.value = newDemand.id;
+            // Atualiza a lista de clientes principal e filtra
+            const currentClient = clientSelect.value;
+            filterDemandsByClient(currentClient);
+            // Se o cliente da nova demanda for o selecionado, seleciona a nova demanda
+            if (clientId === currentClient) {
+                demandSelect.value = newDemand.id;
+            }
             closeModal('newDemandModal');
         } catch (error) {
             alert(`Erro ao criar demanda: ${error.message}`);
@@ -312,7 +347,6 @@
         api.generateReport(clientId, clientName).catch(err => alert(err.message));
     });
 
-    // --- Inicia o aplicativo ---
     document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
