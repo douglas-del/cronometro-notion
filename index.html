@@ -94,20 +94,35 @@
         </div>
     </div>
 
-    <!-- Modal de Erro Aprimorado -->
+    <!-- Modal de Erro -->
     <div id="errorModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop">
         <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4 text-center relative">
-            <!-- Botão X para fechar -->
             <button onclick="closeModal('errorModal')" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
                 <i class="fas fa-times"></i>
             </button>
-            
             <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
             <h3 class="text-xl font-bold text-white">Ocorreu um Erro</h3>
             <p id="errorMessage" class="text-gray-300">Mensagem de erro aqui.</p>
             <div class="pt-4">
                  <a href="https://replit.com/@douglas115/cronometro-notion-final" target="_blank" class="block px-4 py-2 bg-yellow-500 text-black font-semibold rounded-md w-full">
                     Acordar Servidor
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOVO: Modal de Sucesso -->
+    <div id="successModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4 text-center relative">
+            <button onclick="closeModal('successModal')" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+            <i class="fas fa-check-circle text-green-500 text-4xl mb-4"></i>
+            <h3 class="text-xl font-bold text-white">Sucesso!</h3>
+            <p id="successMessage" class="text-gray-300">Mensagem de sucesso aqui.</p>
+            <div class="pt-4">
+                 <a id="goToSheetBtn" href="#" target="_blank" class="block px-4 py-2 bg-blue-500 text-white font-semibold rounded-md w-full">
+                    Ir para Planilha
                 </a>
             </div>
         </div>
@@ -139,6 +154,9 @@
     const saveDemandButton = document.getElementById('saveDemandButton');
     const errorModal = document.getElementById('errorModal');
     const errorMessage = document.getElementById('errorMessage');
+    const successModal = document.getElementById('successModal');
+    const successMessage = document.getElementById('successMessage');
+    const goToSheetBtn = document.getElementById('goToSheetBtn');
 
     let appState = {
         clients: [],
@@ -193,7 +211,8 @@
                     throw new Error(err.error || 'Falha ao gerar relatório.');
                 }
                 const result = await response.json();
-                alert(result.message);
+                // ALTERAÇÃO: Chama o novo modal de sucesso
+                showSuccessModal(result.message, result.sheetUrl);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fas fa-file-excel mr-2"></i><span>Gerar e Atualizar Planilha</span>`;
@@ -235,7 +254,6 @@
 
     function toggleTimer() {
         if (appState.isTimerRunning) {
-            // Parando o cronômetro
             clearInterval(appState.timerInterval);
             const endTime = Date.now();
             const durationSeconds = Math.round((endTime - appState.startTime) / 1000);
@@ -261,7 +279,6 @@
                 });
 
         } else {
-            // Iniciando o cronômetro
             const selectedDemandId = demandSelect.value;
             if (!selectedDemandId) {
                 showErrorModal('Por favor, selecione uma demanda para iniciar.');
@@ -295,6 +312,13 @@
     function showErrorModal(message) {
         errorMessage.textContent = message;
         openModal('errorModal');
+    }
+
+    // NOVA FUNÇÃO: Para mostrar o modal de sucesso
+    function showSuccessModal(message, sheetUrl) {
+        successMessage.textContent = message;
+        goToSheetBtn.href = sheetUrl;
+        openModal('successModal');
     }
 
     async function initializeApp() {
