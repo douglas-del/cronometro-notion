@@ -18,11 +18,20 @@
 <body class="p-4">
 
     <main class="w-full max-w-lg mx-auto notion-app-container rounded-lg p-6 space-y-6">
+        <!-- Modal de Erro Aprimorado -->
+<div id="errorModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop">
+    <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4 relative">
+        <button onclick="closeModal('errorModal')" class="absolute top-3 right-3 text-gray-400 hover:text-white">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="text-center">
+            <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-3"></i>
+            <h3 class="text-xl font-bold text-white">Ocorreu um Erro</h3>
+            <p id="errorMessage" class="text-gray-300 mt-2"></p>
+        </div>
+    </div>
+</div>
 
-        <!-- NOVO BOTÃO DE ATALHO PARA O REPLIT -->
-        <a href="https://replit.com/@douglas115/cronometro-notion-final" target="_blank" title="Acordar o servidor no Replit" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
-            <i class="fas fa-external-link-alt"></i>
-        </a>
         <div class="text-center">
             <h1 class="text-2xl font-bold text-white">Cronômetro Notion</h1>
             <div id="loadingState" class="text-sm text-yellow-400 mt-2 flex items-center justify-center gap-2">
@@ -120,6 +129,14 @@
     const newDemandClientSelect = document.getElementById('newDemandClientSelect');
     const newDemandName = document.getElementById('newDemandName');
     const saveDemandButton = document.getElementById('saveDemandButton');
+    const errorModal = document.getElementById('errorModal');
+    const errorMessage = document.getElementById('errorMessage');
+
+function showError(message) {
+    errorMessage.textContent = message;
+    openModal('errorModal');
+}
+
 
     let appState = {
         clients: [],
@@ -215,36 +232,57 @@
     }
 
     function toggleTimer() {
-        if (appState.isTimerRunning) {
-            // Parando o cronômetro
-            clearInterval(appState.timerInterval);
-            const endTime = Date.now();
-            const durationSeconds = Math.round((endTime - appState.startTime) / 1000);
-            
-            // **CORREÇÃO CRÍTICA NA LÓGICA DE SALVAMENTO**
-            api.createTimeEntry(appState.selectedDemandId, durationSeconds)
-                .then(response => {
-                    console.log('Registro criado com sucesso!', response);
-                    alert(`Tempo registrado: ${formatTime(durationSeconds * 1000)}`);
-                    
-                    // Limpa o estado salvo SOMENTE APÓS o sucesso
-                    localStorage.removeItem('timerStartTime');
-                    localStorage.removeItem('timerActiveDemandId');
-                    
-                    // Reset UI
-                    appState.isTimerRunning = false;
-                    toggleButton.innerHTML = `<i class="fas fa-play mr-2"></i><span>Iniciar</span>`;
-                    toggleButton.classList.remove('bg-red-600');
-                    timerDisplay.textContent = '00:00:00';
-                    clientSelect.disabled = false;
-                    demandSelect.disabled = false;
-                })
-                .catch(err => {
-                    console.error('Erro ao criar registro:', err);
-                    alert('Falha ao registrar o tempo. O servidor pode estar inativo. Por favor, "acorde" o servidor no Replit e tente parar novamente. Seu tempo não foi perdido.');
-                });
+    if (appState.isTimerRunning) {
+        // Parando o cronômetro
+        clearInterval(appState.timerInterval);
+        const endTime = Date.now();
+        const durationSeconds = Math.round((endTime - appState.startTime) / 1000);
 
-        } else {
+        api.createTimeEntry(appState.selectedDemandId, durationSeconds)
+            .then(response => {
+                console.log('Registro criado com sucesso!', response);
+
+                // Limpa o estado salvo SOMENTE APÓS o sucesso
+                localStorage.removeItem('timerStartTime');
+                localStorage.removeItem('timerActiveDemandId');
+
+                // Reset UI
+                appState.isTimerRunning = false;
+                toggleButton.innerHTML = `<i class="fas fa-play mr-2"></i><span>Iniciar</span>`;
+                toggleButton.classList.remove('bg-red-600');
+                timerDisplay.textContent = '00:00:00';
+                clientSelect.disabled = false;
+                demandSelect.disabled = false;
+            })
+            .catch(err => {
+                console.error('Erro ao criar registro:', err);
+                // A mensagem de erro agora usa o novo pop-up
+                showError(`Falha ao registrar o tempo. Verifique sua conexão ou tente novamente. Seu tempo não foi perdido.`);
+            });
+
+    } else {
+        // Iniciando o cronômetro
+        const selectedDemandId = demandSelect.value;
+        if (!selectedDemandId) {
+            showError('Por favor, selecione uma demanda para iniciar.');
+            return;
+        }
+        appState.selectedDemandId = selectedDemandId;
+        appState.isTimerRunning = true;
+        appState.startTime = Date.now();
+
+        localStorage.setItem('timerStartTime', appState.startTime);
+        localStorage.setItem('timerActiveDemandId', appState.selectedDemandId);
+
+        startTimerDisplay();
+
+        toggleButton.innerHTML = `<i class="fas fa-stop mr-2"></i><span>Parar</span>`;
+        toggleButton.classList.add('bg-red-600');
+        clientSelect.disabled = true;
+        demandSelect.disabled = true;
+    }
+}
+ else {
             // Iniciando o cronômetro
             const selectedDemandId = demandSelect.value;
             if (!selectedDemandId) {
@@ -326,7 +364,7 @@
         const clientId = newDemandClientSelect.value;
         const demandName = newDemandName.value.trim();
         if (!clientId || !demandName) {
-            alert('Preencha todos os campos para criar a demanda.');
+            showError('Preencha todos os campos para criar a demanda.');
             return;
         }
         try {
@@ -339,21 +377,22 @@
             }
             closeModal('newDemandModal');
         } catch (error) {
-            alert(`Erro ao criar demanda: ${error.message}`);
+           showError(`Erro ao criar demanda: ${error.message}`);
         }
     });
 
     generateReportBtn.addEventListener('click', () => {
         const clientId = reportClientSelect.value;
         if (!clientId) {
-            alert('Por favor, selecione um cliente para gerar o relatório.');
+           showError('Por favor, selecione um cliente para gerar o relatório.');
             return;
         }
         const clientName = reportClientSelect.options[reportClientSelect.selectedIndex].text;
-        api.generateReport(clientId, clientName).catch(err => alert(err.message));
+        api.generateReport(clientId, clientName).catch(showError(err.message));
     });
 
     document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
 </html>
+
