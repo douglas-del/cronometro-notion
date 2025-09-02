@@ -19,6 +19,7 @@
 
     <main class="w-full max-w-lg mx-auto notion-app-container rounded-lg p-6 space-y-6">
 
+        <!-- NOVO BOTÃO DE ATALHO PARA O REPLIT -->
         <a href="https://replit.com/@douglas115/cronometro-notion-final" target="_blank" title="Acordar o servidor no Replit" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
             <i class="fas fa-external-link-alt"></i>
         </a>
@@ -78,6 +79,7 @@
     <!-- Modal para Nova Demanda -->
     <div id="newDemandModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop">
         <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4">
+            <!-- CORREÇÃO: Adicionadas classes para cor e alinhamento -->
             <h3 class="text-xl font-bold text-white text-center">Criar Nova Demanda</h3>
             <div>
                 <label for="newDemandClientSelect" class="block text-sm font-medium text-gray-300 mb-1">Associar ao Cliente:</label>
@@ -94,45 +96,11 @@
         </div>
     </div>
 
-    <!-- Modal de Erro -->
-    <div id="errorModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop">
-        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4 text-center relative">
-            <button onclick="closeModal('errorModal')" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
-                <i class="fas fa-times"></i>
-            </button>
-            <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
-            <h3 class="text-xl font-bold text-white">Ocorreu um Erro</h3>
-            <p id="errorMessage" class="text-gray-300">Mensagem de erro aqui.</p>
-            <div class="pt-4">
-                 <a href="https://replit.com/@douglas115/cronometro-notion-final" target="_blank" class="block px-4 py-2 bg-yellow-500 text-black font-semibold rounded-md w-full">
-                    Acordar Servidor
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- NOVO: Modal de Sucesso -->
-    <div id="successModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop">
-        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm space-y-4 text-center relative">
-            <button onclick="closeModal('successModal')" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
-                <i class="fas fa-times"></i>
-            </button>
-            <i class="fas fa-check-circle text-green-500 text-4xl mb-4"></i>
-            <h3 class="text-xl font-bold text-white">Sucesso!</h3>
-            <p id="successMessage" class="text-gray-300">Mensagem de sucesso aqui.</p>
-            <div class="pt-4">
-                 <a id="goToSheetBtn" href="#" target="_blank" class="block px-4 py-2 bg-blue-500 text-white font-semibold rounded-md w-full">
-                    Ir para Planilha
-                </a>
-            </div>
-        </div>
-    </div>
-
     <script>
     // ===================================================================================
     // CONFIGURAÇÃO
     // ===================================================================================
-    const API_BASE_URL = "https://ef6a0caf-b9d1-4175-b371-447d581b64dc-00-1y3du8b3xyoj2.janeway.replit.dev";
+    const API_BASE_URL = "https://cronometro-notion-backend.onrender.com";
 
     // ===================================================================================
     // LÓGICA DO APLICATIVO
@@ -152,11 +120,6 @@
     const newDemandClientSelect = document.getElementById('newDemandClientSelect');
     const newDemandName = document.getElementById('newDemandName');
     const saveDemandButton = document.getElementById('saveDemandButton');
-    const errorModal = document.getElementById('errorModal');
-    const errorMessage = document.getElementById('errorMessage');
-    const successModal = document.getElementById('successModal');
-    const successMessage = document.getElementById('successMessage');
-    const goToSheetBtn = document.getElementById('goToSheetBtn');
 
     let appState = {
         clients: [],
@@ -170,12 +133,12 @@
     const api = {
         async getClients() {
             const response = await fetch(`${API_BASE_URL}/api/clients`);
-            if (!response.ok) throw new Error('Falha ao buscar clientes. O servidor pode estar inativo.');
+            if (!response.ok) throw new Error('Falha ao buscar clientes.');
             return response.json();
         },
         async getDemands() {
             const response = await fetch(`${API_BASE_URL}/api/demands`);
-            if (!response.ok) throw new Error('Falha ao buscar demandas. O servidor pode estar inativo.');
+            if (!response.ok) throw new Error('Falha ao buscar demandas.');
             return response.json();
         },
         async createDemand(clientId, demandName) {
@@ -211,8 +174,7 @@
                     throw new Error(err.error || 'Falha ao gerar relatório.');
                 }
                 const result = await response.json();
-                // ALTERAÇÃO: Chama o novo modal de sucesso
-                showSuccessModal(result.message, result.sheetUrl);
+                alert(result.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fas fa-file-excel mr-2"></i><span>Gerar e Atualizar Planilha</span>`;
@@ -254,18 +216,22 @@
 
     function toggleTimer() {
         if (appState.isTimerRunning) {
+            // Parando o cronômetro
             clearInterval(appState.timerInterval);
             const endTime = Date.now();
             const durationSeconds = Math.round((endTime - appState.startTime) / 1000);
             
+            // **CORREÇÃO CRÍTICA NA LÓGICA DE SALVAMENTO**
             api.createTimeEntry(appState.selectedDemandId, durationSeconds)
                 .then(response => {
                     console.log('Registro criado com sucesso!', response);
                     alert(`Tempo registrado: ${formatTime(durationSeconds * 1000)}`);
                     
+                    // Limpa o estado salvo SOMENTE APÓS o sucesso
                     localStorage.removeItem('timerStartTime');
                     localStorage.removeItem('timerActiveDemandId');
                     
+                    // Reset UI
                     appState.isTimerRunning = false;
                     toggleButton.innerHTML = `<i class="fas fa-play mr-2"></i><span>Iniciar</span>`;
                     toggleButton.classList.remove('bg-red-600');
@@ -275,13 +241,14 @@
                 })
                 .catch(err => {
                     console.error('Erro ao criar registro:', err);
-                    showErrorModal('Falha ao registrar o tempo. O servidor pode estar inativo. Tente "Acordar o Servidor" e parar novamente. Seu tempo não foi perdido.');
+                    alert('Falha ao registrar o tempo. O servidor pode estar inativo. Por favor, "acorde" o servidor no Replit e tente parar novamente. Seu tempo não foi perdido.');
                 });
 
         } else {
+            // Iniciando o cronômetro
             const selectedDemandId = demandSelect.value;
             if (!selectedDemandId) {
-                showErrorModal('Por favor, selecione uma demanda para iniciar.');
+                alert('Por favor, selecione uma demanda para iniciar.');
                 return;
             }
             appState.selectedDemandId = selectedDemandId;
@@ -307,18 +274,6 @@
     function closeModal(modalId) { 
         const modal = document.getElementById(modalId);
         modal.classList.add('hidden');
-    }
-
-    function showErrorModal(message) {
-        errorMessage.textContent = message;
-        openModal('errorModal');
-    }
-
-    // NOVA FUNÇÃO: Para mostrar o modal de sucesso
-    function showSuccessModal(message, sheetUrl) {
-        successMessage.textContent = message;
-        goToSheetBtn.href = sheetUrl;
-        openModal('successModal');
     }
 
     async function initializeApp() {
@@ -359,7 +314,8 @@
         } catch (error) {
             console.error("Erro ao inicializar:", error);
             loadingState.classList.add('hidden');
-            showErrorModal(error.message);
+            errorState.textContent = `Erro ao conectar ao Notion: ${error.message}`;
+            errorState.classList.remove('hidden');
         }
     }
 
@@ -370,7 +326,7 @@
         const clientId = newDemandClientSelect.value;
         const demandName = newDemandName.value.trim();
         if (!clientId || !demandName) {
-            showErrorModal('Preencha todos os campos para criar a demanda.');
+            alert('Preencha todos os campos para criar a demanda.');
             return;
         }
         try {
@@ -383,18 +339,18 @@
             }
             closeModal('newDemandModal');
         } catch (error) {
-            showErrorModal(error.message);
+            alert(`Erro ao criar demanda: ${error.message}`);
         }
     });
 
     generateReportBtn.addEventListener('click', () => {
         const clientId = reportClientSelect.value;
         if (!clientId) {
-            showErrorModal('Por favor, selecione um cliente para gerar o relatório.');
+            alert('Por favor, selecione um cliente para gerar o relatório.');
             return;
         }
         const clientName = reportClientSelect.options[reportClientSelect.selectedIndex].text;
-        api.generateReport(clientId, clientName).catch(err => showErrorModal(err.message));
+        api.generateReport(clientId, clientName).catch(err => alert(err.message));
     });
 
     document.addEventListener('DOMContentLoaded', initializeApp);
