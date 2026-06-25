@@ -5,7 +5,11 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' *.notion.so notion.so"
+          "value": "frame-ancestors 'self' https://*.notion.so [https://notion.so](https://notion.so) https://*.notion.new"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
         }
       ]
     }
